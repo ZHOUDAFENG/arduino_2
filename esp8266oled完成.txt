@@ -1,0 +1,212 @@
+ /**
+  * The MIT License (MIT)
+  *
+  * Copyright (c) 2018 by ThingPulse, Daniel Eichhorn
+  * Copyright (c) 2018 by Fabrice Weinberg
+  *
+  * Permission is hereby granted, free of charge, to any person obtaining a copy
+  * of this software and associated documentation files (the "Software"), to deal
+  * in the Software without restriction, including without limitation the rights
+  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  * copies of the Software, and to permit persons to whom the Software is
+  * furnished to do so, subject to the following conditions:
+  *
+  * The above copyright notice and this permission notice shall be included in all
+  * copies or substantial portions of the Software.
+  *
+  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  * SOFTWARE.
+  *
+  * ThingPulse invests considerable time and money to develop these open source libraries.
+  * Please support us by buying our products (and not the clones) from
+  * https://thingpulse.com
+  *
+  */
+
+ ///
+#include <ESP8266WiFi.h>
+#include <Servo.h> 
+
+#include "Adafruit_MQTT.h"
+#include "Adafruit_MQTT_Client.h"
+
+/************************* WiFi Access Point *********************************/
+
+#define WLAN_SSID       "Len"
+#define WLAN_PASS       "11223355"
+
+/************************* Adafruit.io Setup *********************************/
+
+#define AIO_SERVER      "192.168.43.133"
+#define AIO_SERVERPORT  1883                   // use 8883 for SSL
+#define AIO_USERNAME    "zhou"
+#define AIO_KEY         ""
+
+
+
+ // Include the correct display library
+ // For a connection via I2C using Wire include
+ #include <Wire.h>  // Only needed for Arduino 1.6.5 and earlier
+//#include "SSD1306Wire.h" // legacy include: `#include "SSD1306.h"`
+ // or #include "SH1106Wire.h", legacy include: `#include "SH1106.h"`
+ // For a connection via I2C using brzo_i2c (must be installed) include
+ // #include <brzo_i2c.h> // Only needed for Arduino 1.6.5 and earlier
+ // #include "SSD1306Brzo.h"
+ // #include "SH1106Brzo.h"
+ // For a connection via SPI include
+ // #include <SPI.h> // Only needed for Arduino 1.6.5 and earlier
+ #include "SSD1306Spi.h"
+ // #include "SH1106SPi.h"
+
+ // Use the corresponding display class:
+
+ // Initialize the OLED display using SPI
+ // D5 -> CLK
+ // D7 -> MOSI (DOUT)
+ // D0 -> RES
+ // D2 -> DC
+ // D8 -> CS
+SSD1306Spi   display(D0, D2, D8);
+ // or
+ // SH1106Spi         display(D0, D2);
+
+ // Initialize the OLED display using brzo_i2c
+ // D3 -> SDA
+ // D5 -> SCL
+ // SSD1306Brzo display(0x3c, D3, D5);
+ // or
+ // SH1106Brzo  display(0x3c, D3, D5);
+
+ // Initialize the OLED display using Wire library
+ //SSD1306Wire  display(0x3c, D3, D5);
+ // SH1106 display(0x3c, D3, D5);
+
+// Adapted from Adafruit_SSD1306
+WiFiClient client;
+Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME);
+Adafruit_MQTT_Publish photocell = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/oledsay");
+Adafruit_MQTT_Subscribe onoffbutton = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/oled");
+void MQTT_connect();
+
+void fillRect(void) {
+  uint8_t color = 1;
+  for (int16_t i=0; i<display.getHeight()/2; i+=3) {
+    display.setColor((color % 2 == 0) ? BLACK : WHITE); // alternate colors
+    display.fillRect(i, i, display.getWidth() - i*2, display.getHeight() - i*2);
+    display.display();
+    delay(10);
+    color++;
+  }
+  // Reset back to WHITE
+  display.setColor(WHITE);
+}
+
+
+
+void setup() {
+
+  Serial.println();
+   display.init();
+   display.setContrast(255);
+   fillRect();
+   delay(500);
+   WiFi.begin(WLAN_SSID, WLAN_PASS);
+   while (WiFi.status() != WL_CONNECTED) {
+   display.setLogBuffer(5, 30);
+   int i=0;
+   while(WiFi.status() != WL_CONNECTED){
+     display.clear();
+     display.println("connect...");
+     i++;
+     if(i==3){
+      i=0;
+      display.println("");
+      }
+     display.drawLogBuffer(0, 0);
+     display.display();
+     delay(100);
+  }
+    display.setLogBuffer(5, 30);
+    display.clear();
+    display.println(WiFi.localIP());
+    display.drawLogBuffer(0, 0);
+    display.display();
+    delay(1000); 
+  }
+  mqtt.subscribe(&onoffbutton);
+
+}
+
+uint32_t x=0;
+
+void loop() {
+  MQTT_connect();
+
+  
+  display.setLogBuffer(5, 30);
+  Adafruit_MQTT_Subscribe *subscription;
+  while ((subscription = mqtt.readSubscription(2000))) {
+    if (subscription == &onoffbutton) {
+    display.clear();
+    display.println((char *)onoffbutton.lastread);
+    display.drawLogBuffer(0, 0);
+    display.display();
+    delay(10); 
+    }
+  }
+
+  if (! photocell.publish("oled 1 is ok")) {
+     display.clear();
+    display.println("Failed");
+    display.drawLogBuffer(0, 0);
+    display.display(); 
+  } else {
+  }
+
+
+
+  
+  }
+
+
+
+
+
+void MQTT_connect() {
+  int8_t ret;
+
+  // Stop if already connected.
+  if (mqtt.connected()) {
+    return;
+  }
+
+    display.clear();
+    display.println("MQTT connecting");
+    display.drawLogBuffer(0, 0);
+    display.display();
+    uint8_t retries = 1000;
+    while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+    display.clear();
+    display.println("Retrying MQTT connection in 5 seconds...");
+    display.drawLogBuffer(0, 0);
+    display.display();
+    delay(50); 
+    mqtt.disconnect();
+    delay(5000);  // wait 5 seconds
+    retries--;
+       if (retries == 0) {
+         // basically die and wait for WDT to reset me
+         while (1);
+       }
+  }
+    delay(50); 
+    display.clear();
+    display.println("MQTT is ok!!!");
+    display.drawLogBuffer(0, 0);
+    display.display();
+}

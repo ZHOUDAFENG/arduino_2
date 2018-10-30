@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Mobile experimental platform </title>
+    <script src="jquery-3.3.1.min.js"></script>
+    <script src="mqtt.js"></script>
+    <script type="text/javascript">
+        var sub_count = 0;
+        var client;
+        var randomvar = String(Math.floor(Math.random() * 1000))
+
+        function MQTTconnect() {
+            client = new Paho.MQTT.Client($('#ipinput').val(), Number($('#portinput').val()), randomvar);
+            client.onMessageArrived = onMessageArrived;
+            $('#sub_message').prepend('<li>' + '连接......' + '</li>');
+            client.connect({
+                onSuccess: onConnect
+            });
+        };
+        // called when the client connects
+        function onConnect() {
+            console.log("onConnect succeeds");
+            $('#sub_message').prepend('<li>' + '连接成功' + '</li>');
+            //  client.subscribe('topic');
+            client.subscribe('#'); //订阅所有主题
+        }
+        // called when a message arrives
+        function onMessageArrived(message) {
+            var topic = message.destinationName;
+            var payload = message.payloadString;
+            let strmsg = payload.split(',');
+            var cls = ['zhou/001say', 'zhou/002say', 'zhou/003say'];
+            if (cls.indexOf(String(topic)) > -1) {
+                if ($('.' + strmsg[0]).length > 0) {
+                    $('.' + strmsg[0]).remove();
+                }
+                $("#stu_count").prepend('<li class=' + strmsg[0] + ' style="' + 'background-color:rgb(' + String(Math.floor(
+                    Math.random() * 250)) + ',' + String(Math.floor(Math.random() * 250)) + ', ' + String(Math.floor(
+                    Math.random() * 250)) + ');"' + '>'+ '|' + strmsg[0] + '|' +strmsg[1] + '|'+strmsg[2]+  '|'+strmsg[3]+'|'+strmsg[4]+'|'+'</li>');
+
+            }
+            //$("#stu_count").prepend('<li id="zhou/001say"  style="'+'background-color:rgb('+String(Math.floor(Math.random() * 250))+','+String(Math.floor(Math.random() * 250))+', '+String(Math.floor(Math.random() * 250))+');"'+'>' + topic + ' = ' + payload + '</li>');
+            console.log("onMessageArrived:" + payload);
+            sub_count++;
+            $('#sub_count').val('收到订阅' + sub_count + '条');
+            $('#sub_message').prepend('<li style="' + 'background-color:rgb(' + String(Math.floor(Math.random() * 250)) +
+                ',' + String(Math.floor(Math.random() * 250)) + ', ' + String(Math.floor(Math.random() * 250)) +
+                ');"' + '>' + topic + ' = ' + payload + '</li>');
+        }
+
+        function button_onclick() {
+            try {
+                var topic = $('#topicsend').val();
+                var text = $('#textsend').val();
+                if (topic == '' || text == '') {
+                    alert("noTopic or noText");
+                    return;
+                }
+                var message = new Paho.MQTT.Message(text);
+                message.destinationName = topic;
+                message.qos = 0;
+                client.send(message);
+
+            } catch (err) {
+                console.log(err);
+                console.log("重连\n");
+                MQTTconnect();
+                $('#sub_message').prepend('<li style="' + 'background-color:rgb(255,10,10);"' + '>' + "链接服务器..." +
+                    '</li>');
+
+            }
+
+        };
+
+        function sendtoesp(a) {
+            console.log(a);
+            try {
+                var topic = "zhou/000";
+                var text = String(a);
+                var message = new Paho.MQTT.Message(text);
+                message.destinationName = topic;
+                message.qos = 0;
+                client.send(message);
+
+            } catch (err) {
+                console.log(err);
+                console.log("重连\n");
+                MQTTconnect();
+                $('#sub_message').prepend('<li style="' + 'background-color:rgb(255,10,10);"' + '>' + "链接服务器..." +
+                    '</li>');
+
+            }
+
+        }
+        $(document).ready(function () {
+            MQTTconnect();
+        });
+    </script>
+    <style>
+        body {
+
+            background-color: rgba(196, 192, 144, 0.623);
+
+        }
+
+        body div {
+            text-align: center;
+
+        }
+
+        h1 {
+            background-color: rgba(156, 145, 197, 0.486);
+            border-radius: 20px 10px 50px 2px;
+        }
+
+        body div div {
+            height: 50px;
+            text-align: center;
+            background-color: rgba(25, 201, 69, 0.747);
+            border-radius: 10px 50px 20px 50px;
+        }
+
+        body div img {
+            width: 5%;
+        }
+
+        li {
+            width: 80%;
+            height: 30px;
+            color: rgb(255, 255, 255);
+
+        }
+    </style>
+</head>
+
+<!--  -->
+
+<body>
+    <h1>MQTT PUB</h1>
+    <div>
+        host_:<input type='text' id='ipinput' value="172.16.145.3" placeholder="127.0.0.1" size="54" /> port_:
+        <input type='text' id='portinput' value="1882" placeholder="1882" size="10" /><br> topic:
+        <input type='text' id='topicsend' value="主题" size="70" /> <br> text_:
+        <input type='text' id='textsend' value="消息" size="70" /><br>
+        <br><br><br>
+        <div>
+            <img src="./ico/2.png" id="btn" onclick="MQTTconnect()">
+            <img src="./ico/3.ico" id="btn" onclick="button_onclick()">
+        </div>
+        <br>
+        <br>
+        <div style="Float:left;">
+            <input type="button" value="实验1" , style="width:50px;height:50px;" onclick="sendtoesp(1)" />
+            <input type="submit" value="实验2" style="width:50px;height:50px;" onclick="sendtoesp(2)" />
+            <input type="button" value="实验3" style="width:50px;height:50px;" onclick="sendtoesp(3)" />
+            <input type="button" value="实验4" style="width:50px;height:50px;" onclick="sendtoesp(4)" />
+        </div>
+        <div style="float: right;">
+            <input type='text' id='003' size="80" value="学号                 实验次数              分数                    时间                     次数                                                "
+                disabled /><br>
+            <ul id='stu_count'></ul>
+        </div>
+        <br>
+        <br>
+
+    </div>
+
+    <br><br><br><br><br>
+
+    <br>
+    <h1>MQTT SUB</h1>
+    <input type='text' id='sub_count' size="85" disabled />
+    <ul id='sub_message'></ul>
+</body>
+
+</html>
